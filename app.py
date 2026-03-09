@@ -1,6 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import time
 
 # 秘書の設定（UI）
 st.set_page_config(page_title="投資秘書：1,000円修行", page_icon="🛡️")
@@ -15,29 +16,38 @@ tickers = {
     "明豊エンタ (8927)": "8927.T"
 }
 
-# データ取得
 results = []
+
+# データ取得（エラーハンドリング付き）
 for name, t in tickers.items():
-    stock = yf.Ticker(t)
-    hist = stock.history(period="1d")
-    if not hist.empty:
-        open_p = hist['Open'].iloc[0]
-        close_p = hist['Close'].iloc[0]
-        diff = close_p - open_p
-        results.append({
-            "銘柄": name,
-            "始値(9:00)": f"{open_p:.1f}円",
-            "終値(15:00)": f"{close_p:.1f}円",
-            "日中騰落": "🔥反撃成功" if diff > 0 else "❄️耐え"
-        })
+    try:
+        stock = yf.Ticker(t)
+        # 1日分のデータを取得
+        hist = stock.history(period="2d") # 念のため2日分
+        if len(hist) >= 2:
+            open_p = hist['Open'].iloc[-1]
+            close_p = hist['Close'].iloc[-1]
+            diff = close_p - open_p
+            status = "🔥反撃成功" if diff > 0 else "❄️耐え"
+            results.append({
+                "銘柄": name,
+                "始値": f"{open_p:.1f}円",
+                "終値": f"{close_p:.1f}円",
+                "判定": status
+            })
+        else:
+            results.append({"銘柄": name, "始値": "取得中...", "終値": "取得中...", "判定": "待機"})
+    except Exception as e:
+        results.append({"銘柄": name, "始値": "エラー", "終値": "エラー", "判定": "休憩中"})
 
 # テーブル表示
-df = pd.DataFrame(results)
-st.table(df)
+if results:
+    df = pd.DataFrame(results)
+    st.table(df)
 
 # 本陣(NTT)の状況
 st.subheader("🛡️ 本陣（NTT）の状況")
 st.success("日経平均が歴史的な暴落(-2,892円)をする中、本陣は逆行高で守りきりました。さすがマスターの眼力です！")
 
 # 修行僧への一言
-st.info("アビックス(7836)もこの地合いでプラスです。低位株の底力が見えましたね。")
+st.info("※データ取得エラーが出る場合は、少し時間を置いてから再読み込みしてください。秘書がデータを取ってきます！")
